@@ -1,0 +1,438 @@
+openapi: 3.0.1
+info:
+  title: Iternio / ABRP
+  version: "0.0.1"
+  description: |
+    Inofficial OpenAPI spec for ABRP
+servers:
+  - url: "https://api.iternio.com/1"
+    description: Main Server
+paths:
+  /get_carmodels:
+    get:
+      summary: Gets the available car models
+      operationId: GetCarModels
+      responses:
+        200:
+          description: A list of car models available for consideration in the planning
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Car'
+  /get_chargers:
+    get:
+      summary: Gets the available chargers
+      operationId: GetChargers
+      parameters:
+        - in: query
+          name: lat
+          required: true
+          schema:
+            type: number
+            format: float
+          description: The latitude of the center of the charger search.
+        - in: query
+          name: lon
+          required: true
+          schema:
+            type: number
+            format: float
+          description: The longitude of the center of the charger search.
+        - in: query
+          name: types
+          schema:
+            type: string
+          required: true
+          description: |
+            Comma-separated list of charger types.
+            Available types include "SC" (Tesla Supercharger, only one with capital letters), "ccs", "chademo",
+            "type2" and many more.
+        - in: query
+          name: radius
+          required: true
+          schema:
+            type: number
+            format: float
+          description: The search radius.
+        - in: query
+          name: ids
+          schema:
+            type: string
+          required: false
+          description: CSV. One or more charger IDs. If given, no other parameters are needed.
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+          description: |
+            [Optional] Maximum number of results, default (and max) is 5000.
+            The chargers will be sorted in order of power.
+        - in: query
+          name: allowed_dbs
+          schema:
+            type: string
+          required: false
+          description: |
+            [Optional] If given, this limits the chargers returned to be from the specified set of charger databases.
+      responses:
+        200:
+          description: |
+            The result will include at most 5000 chargers.The result is an array consisting of charger objects.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Charger'
+  /get_outlet_types:
+    get:
+      summary: |
+        This method is mostly intended for API developers who want to get the full list of our charger outlet types.
+        For customer where we import a charger database and convert connector/EVSE/outlet types to
+        our types we also provide a translation table.
+      operationId: GetOutputTypes
+      responses:
+        200:
+          description: A list of Outlet types
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Outlet'
+  /get_networks:
+    get:
+      summary: Gets the available networks
+      operationId: GetNetworks
+      responses:
+        200:
+          description: |
+            This method is mostly intended for API developers who want to get the full list of our charger networks.
+  /plan:
+    get:
+      summary: Plan a route
+      operationId: PlanRoute
+      parameters:
+        - name: destinations
+          schema:
+            type: array
+            items:
+               $ref: '#/components/schemas/Destination'
+          in: query
+          description: |
+            An array of at least two destination objects (defined below).
+            The first is the starting point, in-between are waypoints, and the last is the destination.
+        - name: car_model
+          in: query
+          schema:
+            type: string
+          description: |
+            The typecode (from the get_carmodels method) describing the exact car model to be used for the plan.
+        - name: ref_consumption
+          in: query
+          schema:
+            type: integer
+          description: |
+            The reference consumption of the car_model. The default reference consumption for each car model is given by
+            the get_carmodels method.
+            Unless there is better information, use this default.
+        - name: fast_chargers
+          schema:
+            type: string
+          in: query
+          description: |
+            A comma-separated list of charger types to be used in the route planning.
+            The charger types are the same as in the get_chargers method.
+        - name: initial_soc_perc
+          in: query
+          schema:
+            type: number
+            format: float
+          required: false
+          description: |
+            [Optional] The starting SoC of the car.
+        - name: charger_soc_perc
+          in: query
+          schema:
+            type: number
+            format: float
+          required: false
+          description: |
+            [Optional] The minimum SoC allowed when arriving at any charger or waypoint.
+        - name: arrival_soc_perc
+          in: query
+          schema:
+            type: number
+            format: float
+          required: false
+          description: |
+            [Optional] The minimum SoC allowed when arriving at the final destination.
+        - name: charge_overhead
+          in: query
+          schema:
+            type: number
+            format: float
+          required: false
+          description: |
+            [Optional] The overhead to add to the driving time and charging time for each charge stop.
+            This typically accounts for finding the charger, connecting it and starting it.
+            A higher value here will lead to fewer but longer charge stops.
+        - name: speed_factor_perc
+          in: query
+          schema:
+            type: number
+            format: float
+          required: false
+          description: |
+            [Optional] A speed factor relative to the speed limits or estimated speed of the road.
+            Default is 100, and e.g. 110 means 10% faster than speed limits.
+        - name: max_speed
+          in: query
+          schema:
+            type: number
+            format: float
+          required: false
+          description: |
+            [Optional] The maximum speed which the planner will allow for the car, even if speed limits allow more.
+            This is mostly useful for very high speed highways, such as Autobahns.
+        - name: allow_ferry
+          in: query
+          schema:
+            type: boolean
+          required: false
+          description: |
+            [Optional] Allow the route to include ferries.
+            Only one of "allow_ferry", "allow_toll" and "allow_motorway" can be disabled at a time.
+        - name: allow_toll
+          in: query
+          schema:
+            type: boolean
+          required: false
+          description: |
+            [Optional] Allow the route to include toll roads.
+            Only one of "allow_ferry", "allow_toll" and "allow_motorway" can be disabled at a time.
+        - name: allow_motorway
+          in: query
+          schema:
+            type: boolean
+          required: false
+          description: |
+            [Optional] Allow the route to include highways.
+            Only one of "allow_ferry", "allow_toll" and "allow_motorway" can be disabled at a time.
+        - name: adjust_speed
+          in: query
+          schema:
+            type: boolean
+          required: false
+          description: |
+            [Optional] Allow the planner to lower the maximum speed for individual legs
+            if this is needed to reach the next charger.
+        - name: outside_temp
+          in: query
+          schema:
+            type: number
+            format: float
+          required: false
+          description: |
+            [Optional] The outside temperature for the plan. This will affect consumption of the car model.
+        - name: wind_speed
+          in: query
+          schema:
+            type: number
+            format: float
+          required: false
+          description: |
+            [Optional] The wind speed for the plan.
+        - name: wind_dir
+          in: query
+          schema:
+            type: string
+            enum:
+              - head
+              - tail
+          required: false
+          description: |
+            [Optional] The wind direction for the plan.
+        - name: road_condition
+          in: query
+          schema:
+            type: string
+            enum:
+              - normal
+              - rain
+              - heavy_rain
+          required: false
+          description: |
+            [Optional] This will increase the consumption according to a simple model of the road condition impact.
+        - name: extra_weight
+          schema:
+            type: integer
+          in: query
+          required: false
+          description: |
+            [Optional] The extra weight assumed for the car for the plan.
+            This will slightly increase the consumption (unless driving downhill).
+        - name: battery_degradation_perc
+          schema:
+            type: number
+            format: float
+          in: query
+          required: false
+          description: |
+            [Optional] The assumed battery degradation of the car compared to a brand new battery.
+            Default is 5% for all cars.
+        - name: path_steps
+          schema:
+            type: boolean
+          in: query
+          required: false
+          description: |
+            [Optional] If true (default) a detailed path step object will be included between any chargers or waypoints,
+            including coordinates, SoC and elevation with high resolution along the way.
+        - name: find_alts
+          schema:
+            type: boolean
+          in: query
+          required: false
+          description: |
+            [Optional] If true, up to two alternative paths will be included in the plan. Default is false.
+        - name: find_next_charger_alts
+          in: query
+          schema:
+            type: boolean
+          required: false
+          description: |
+            [Optional] If true, up to five options for the next charger are returned (as different routes).
+        - name: allowed_network_ids
+          in: query
+          schema:
+            type: string
+          required: false
+          description: |
+            [Optional] If given, this list of network IDs are the only allowed charger networks in the plan.
+        - name: preferred_network_ids
+          schema:
+            type: string
+          in: query
+          required: false
+          description: |
+            [Optional] If given, this list of network IDs are will be preferred over other chargers.
+            This is a soft decision, if other chargers are significantly better for the trip, they will still be used.
+        - name: preferred_charge_cost_multiplier
+          schema:
+            type: number
+            format: float
+          in: query
+          required: false
+          description: |
+            [Optional] If given, the charge time of a preferred network charge is discounted by this factor.
+            For example, 0.7 means that only 70% of the charging time is used as cost in the optimization.
+            This does not affect the charging time presented to the user.
+        - name: nonpreferred_charge_cost_addition
+          schema:
+            type: number
+            format: float
+          in: query
+          required: false
+          description: |
+            [Optional] If given, charging at a non-preferred network charge costs this many seconds extra.
+            For example, a value of 600 means that charging at a non-preferred network charger is assumed
+            to take 5 extra minutes (to make it less likely to be chosen).
+            This does not affect the charging time presented to the user.
+        - name: allowed_dbs
+          in: query
+          schema:
+            type: string
+          required: false
+          description: |
+            [Optional] If given, one or more charger database providers can be specified,
+            and only chargers from these database will be used in the planning.
+      responses:
+        200:
+          description: The planned route
+components:
+  schemas:
+    Car:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Full text name of the car model, hierarchically split by semicolons.
+        typecode:
+          type: string
+          description: The car model typecode used by e.g. the plan method.
+        ref_cons:
+          type: integer
+          description: Wh/km The default reference consumption for the specific car model. Needs to be provided together with the typecode to the plan method.
+        rec_max_speed:
+          type: integer
+          description: km/h A recommended max speed for free speed highways. Should also be provided to the plan method.
+        fast_chargers:
+          type: string
+          description: Comma-separated text string of supported fast chargers (including those with official adapters).
+        rec_fast_chargers:
+          type: string
+          description: Recommended default fast chargers.
+    Charger:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Internal Iternio charger database ID. Used to refer to specific chargers in plan method calls.
+        status:
+          type: string
+          description: |
+            One of
+            "OPEN" - meaning open and functional
+            "LIMITED" - reported broken or with limited opening hours. Will not be used in planning unless explicitly included as a waypoint.
+            "CONSTRUCTION", "CLOSED", etc - not open.
+        name:
+          type: string
+          description: The human readable name of the charger.
+        address:
+          type: string
+          description: The street address of the charger.
+        comment:
+          type: string
+          description: A text comment about the charger.
+        lat:
+          type: number
+          format: float
+          description: The latitude.
+        lon:
+          type: number
+          format: float
+          description: The longitude.
+        outlets:
+          type: array
+          description: An array of outlet objects for this charger.
+          items:
+            $ref: '#/components/schemas/Outlet'
+        location_id:
+          type: string
+          description: The original id of the charger from the source database in format [database name]_[original id]
+    Outlet:
+      type: object
+      properties:
+        type:
+          type: string
+          description: The outlet type (e.g. "ccs")
+        power:
+          type: number
+          format: float
+          description: |
+            [kW] The maximum power of the charger outlet.
+        stalls:
+          type: integer
+          description: The number of stalls for this outlet type.
+    Destination:
+      type: object
+  securitySchemes:
+    api_key:
+      type: apiKey
+      name: api_key
+      in: query
